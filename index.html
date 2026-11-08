@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My School Things - Listen & Speak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --secondary: #FFD966;
+            --accent-pink: #FFB6C1;
+            --accent-green: #7ED957;
+            --bg-color: #FFFDF0;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Fun Animations */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow { animation: bounce-slow 3s infinite ease-in-out; }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in { animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes star-burst {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+        }
+
+        /* 3D Flip Card */
+        .scene {
+            perspective: 1000px;
+        }
+        .card {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            position: relative;
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+            border: 4px solid var(--primary);
+        }
+        .card-face-back {
+            transform: rotateY(180deg);
+            border-color: var(--secondary);
+        }
+
+        /* Custom Button Styles */
+        .btn-cute {
+            transition: all 0.2s;
+            border-bottom-width: 4px;
+        }
+        .btn-cute:active {
+            transform: translateY(4px);
+            border-bottom-width: 0px;
+            margin-top: 4px;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 9999px;
+            height: 1rem;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--accent-green);
+            transition: width 0.5s ease-out;
+        }
+
+        /* Visual Feedback */
+        .correct-glow { box-shadow: 0 0 15px var(--accent-green); border-color: var(--accent-green) !important; }
+        .wrong-glow { box-shadow: 0 0 15px #FC8181; border-color: #FC8181 !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center">
+
+    <!-- Header / Nav -->
+    <header class="w-full max-w-4xl p-4 flex justify-between items-center z-10 relative">
+        <button id="btn-home" class="btn-cute bg-blue-400 text-white font-bold py-2 px-4 rounded-full border-blue-600 shadow-md flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            Home
+        </button>
+        <div class="flex items-center gap-4">
+            <div class="bg-yellow-100 px-4 py-1.5 rounded-full font-bold text-yellow-600 flex items-center gap-1 border-2 border-yellow-300">
+                ⭐ <span id="total-stars">0</span>
+            </div>
+            <button id="btn-sound" class="btn-cute bg-gray-200 text-gray-700 p-2 rounded-full border-gray-400">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="app-container" class="w-full max-w-4xl flex-1 p-4 flex flex-col relative pb-20"></main>
+
+    <!-- Modal overlay for alerts/feedback -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center z-50">
+        <div id="modal-content" class="bg-white rounded-3xl p-8 max-w-sm w-full text-center transform scale-90 transition-transform flex flex-col items-center gap-4 shadow-2xl">
+            <div id="modal-icon" class="text-6xl mb-2">⭐</div>
+            <h2 id="modal-title" class="text-3xl font-bold text-gray-800"></h2>
+            <p id="modal-desc" class="text-lg text-gray-600 font-semibold"></p>
+            <button id="modal-btn" class="mt-4 btn-cute bg-blue-500 text-white font-bold py-3 px-8 rounded-full border-blue-700 text-xl w-full">Continue</button>
+        </div>
+    </div>
+
+<script>
+    /* ==========================================
+       ASSETS (SVGs)
+       ========================================== */
+    const svgs = {
+        mascot: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><circle cx="50" cy="50" r="45" fill="#8B4513"/><circle cx="50" cy="50" r="35" fill="#D2B48C"/><circle cx="20" cy="20" r="15" fill="#8B4513"/><circle cx="80" cy="20" r="15" fill="#8B4513"/><circle cx="35" cy="45" r="5" fill="#000"/><circle cx="65" cy="45" r="5" fill="#000"/><ellipse cx="50" cy="65" rx="12" ry="8" fill="#FFF"/><ellipse cx="50" cy="62" rx="4" ry="3" fill="#000"/><path d="M45 68 Q50 72 55 68" stroke="#000" stroke-width="2" fill="none"/></svg>`,
+        pencil: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><g transform="rotate(45 50 50)"><rect x="40" y="20" width="20" height="60" fill="#FFD700" stroke="#B8860B" stroke-width="2"/><polygon points="40,20 60,20 50,0" fill="#F5DEB3" stroke="#D2B48C" stroke-width="1"/><polygon points="48,4 52,4 50,0" fill="#333"/><rect x="40" y="80" width="20" height="10" fill="#C0C0C0"/><path d="M40 90 Q50 100 60 90 L60 90 L40 90 Z" fill="#FFB6C1"/></g></svg>`,
+        pencilCase: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><rect x="15" y="30" width="70" height="40" rx="10" fill="#4A90E2" stroke="#2171C7" stroke-width="3"/><line x1="20" y1="50" x2="80" y2="50" stroke="#FFD700" stroke-width="4" stroke-dasharray="4 2"/><circle cx="80" cy="50" r="4" fill="#C0C0C0"/></svg>`,
+        notebook: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><rect x="25" y="15" width="55" height="70" rx="4" fill="#FFB6C1" stroke="#FF69B4" stroke-width="3"/><rect x="20" y="15" width="10" height="70" fill="#333"/><circle cx="25" cy="25" r="3" fill="#FFF"/><circle cx="25" cy="40" r="3" fill="#FFF"/><circle cx="25" cy="55" r="3" fill="#FFF"/><circle cx="25" cy="70" r="3" fill="#FFF"/><line x1="40" y1="35" x2="70" y2="35" stroke="#FFF" stroke-width="2"/><line x1="40" y1="50" x2="70" y2="50" stroke="#FFF" stroke-width="2"/><line x1="40" y1="65" x2="60" y2="65" stroke="#FFF" stroke-width="2"/></svg>`,
+        eraser: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><rect x="20" y="35" width="60" height="30" rx="5" fill="#7ED957" stroke="#55A630" stroke-width="2"/><polygon points="80,35 60,65 80,65" fill="#FFF" stroke="#CCC" stroke-width="1" rx="5"/></svg>`,
+        bag_empty: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><path d="M20 40 Q50 30 80 40 L85 90 Q50 100 15 90 Z" fill="#9C27B0" stroke="#7B1FA2" stroke-width="3"/><path d="M30 40 C30 10, 70 10, 70 40" fill="none" stroke="#7B1FA2" stroke-width="5"/></svg>`,
+        bag_pencil_notebook: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><path d="M20 40 Q50 30 80 40 L85 90 Q50 100 15 90 Z" fill="#9C27B0" stroke="#7B1FA2" stroke-width="3"/><path d="M30 40 C30 10, 70 10, 70 40" fill="none" stroke="#7B1FA2" stroke-width="5"/><!-- Insert miniature notebook and pencil --><g transform="scale(0.4) translate(60, 100)"><rect x="25" y="15" width="55" height="70" rx="4" fill="#FFB6C1"/></g><g transform="scale(0.3) rotate(45) translate(180, 0)"><rect x="40" y="20" width="20" height="60" fill="#FFD700"/><polygon points="40,20 60,20 50,0" fill="#F5DEB3"/><polygon points="48,4 52,4 50,0" fill="#333"/></g><path d="M20 50 Q50 60 80 50 L85 90 Q50 100 15 90 Z" fill="#9C27B0" stroke="#7B1FA2" stroke-width="3" opacity="0.9"/></svg>`,
+        desk: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><rect x="10" y="50" width="80" height="15" fill="#8B4513"/><rect x="20" y="65" width="10" height="30" fill="#A0522D"/><rect x="70" y="65" width="10" height="30" fill="#A0522D"/></svg>`,
+        boy: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><circle cx="50" cy="40" r="25" fill="#FFDFC4"/><path d="M25 40 Q50 10 75 40 Z" fill="#1E90FF"/><circle cx="40" cy="35" r="3" fill="#000"/><circle cx="60" cy="35" r="3" fill="#000"/><path d="M45 45 Q50 50 55 45" stroke="#000" stroke-width="2" fill="none"/><rect x="35" y="65" width="30" height="35" fill="#32CD32"/></svg>`,
+        girl: `<svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md"><circle cx="50" cy="40" r="25" fill="#FFDFC4"/><path d="M20 40 Q50 0 80 40 Q70 60 80 80 L20 80 Q30 60 20 40" fill="#FF69B4"/><circle cx="40" cy="35" r="3" fill="#000"/><circle cx="60" cy="35" r="3" fill="#000"/><path d="M45 45 Q50 50 55 45" stroke="#000" stroke-width="2" fill="none"/><rect x="35" y="65" width="30" height="35" fill="#FF1493"/></svg>`
+    };
+
+    /* ==========================================
+       DATA & STATE
+       ========================================== */
+    const VOCAB = [
+        { id: 'pencil', word: 'a pencil', ipa: '/ə ˈpen.səl/', vi: 'một chiếc bút chì', svg: svgs.pencil, ex: 'Do you have a pencil? - Yes, I do.' },
+        { id: 'pencilCase', word: 'a pencil case', ipa: '/ə ˈpen.səl keɪs/', vi: 'một chiếc hộp bút', svg: svgs.pencilCase, ex: 'Do you have a pencil case? - No, I don\'t.' },
+        { id: 'notebook', word: 'a notebook', ipa: '/ə ˈnəʊt.bʊk/', vi: 'một quyển vở', svg: svgs.notebook, ex: 'Do you have a notebook? - Yes, I do.' },
+        { id: 'eraser', word: 'an eraser', ipa: '/ən ɪˈreɪ.zə/', vi: 'một cục tẩy', svg: svgs.eraser, ex: 'Do you have an eraser? - No, I don\'t.' }
+    ];
+
+    const SENTENCES = [
+        { id: 'q', type: 'sentence', title: 'Asking Questions', main: 'Do you have a pencil?', vi: 'Bạn có bút chì không?', struct: 'Do you have + a/an + school thing?' },
+        { id: 'a', type: 'sentence', title: 'Answering', main: 'Yes, I do. / No, I don\'t.', vi: 'Có, mình có. / Không, mình không có.', struct: 'Positive / Negative' }
+    ];
+
+    const FLASHCARDS_DATA = [...VOCAB, ...SENTENCES];
+
+    // --- Task Generators ---
+    const generateLevel1Tasks = () => [
+        { type: 'listen_choose', audio: 'a pencil', correct: 'pencil' },
+        { type: 'look_listen_repeat', word: 'a pencil case', svg: svgs.pencilCase },
+        { type: 'listen_choose', audio: 'a notebook', correct: 'notebook' },
+        { type: 'yes_no_pic', q: 'Do you have a pencil?', img: svgs.pencil, correct: 'yes' },
+        { type: 'look_listen_repeat', word: 'an eraser', svg: svgs.eraser },
+        { type: 'listen_choose', audio: 'an eraser', correct: 'eraser' },
+        { type: 'yes_no_pic', q: 'Do you have a pencil case?', img: svgs.notebook, correct: 'no' }, // pic is notebook, asking for pencil case
+        { type: 'look_listen_repeat', word: 'a pencil', svg: svgs.pencil },
+        { type: 'listen_choose', audio: 'a pencil case', correct: 'pencilCase' },
+        { type: 'look_listen_repeat', word: 'a notebook', svg: svgs.notebook }
+    ];
+
+    const generateLevel2Tasks = () => [
+        { type: 'listen_complete', audio: 'Do you have a pencil case?', text: 'Do you have a ______?', options: ['pencil', 'pencil case', 'notebook', 'eraser'], correct: 'pencil case' },
+        { type: 'bag_answer', q: 'Do you have a pencil?', correct: 'yes' }, // using bag_pencil_notebook SVG
+        { type: 'listen_complete', audio: 'Do you have an eraser?', text: 'Do you have an ______?', options: ['pencil', 'pencil case', 'notebook', 'eraser'], correct: 'eraser' },
+        { type: 'bag_answer', q: 'Do you have a pencil case?', correct: 'no' },
+        { type: 'ask_answer_roleplay', q: 'Do you have a notebook?', expected: 'speaking' },
+        { type: 'listen_complete', audio: 'Do you have a notebook?', text: 'Do you have a ______?', options: ['pencil', 'pencil case', 'notebook', 'eraser'], correct: 'notebook' },
+        { type: 'bag_answer', q: 'Do you have a notebook?', correct: 'yes' },
+        { type: 'listen_complete', audio: 'Do you have a pencil?', text: 'Do you have a ______?', options: ['pencil', 'pencil case', 'notebook', 'eraser'], correct: 'pencil' },
+        { type: 'bag_answer', q: 'Do you have an eraser?', correct: 'no' },
+        { type: 'ask_answer_roleplay', q: 'Do you have a pencil?', expected: 'speaking' }
+    ];
+
+    const generateLevel3Tasks = () => [
+        { type: 'situation', title: 'Situation 1: In the Classroom', prompt: 'A: Do you have a pencil?\nB: Yes, I do.\nA: Do you have an eraser?', instruction: 'You are B. Answer the question!', audioQ: 'Do you have an eraser?', expected: 'speaking' },
+        { type: 'situation_pic', title: 'Situation 2: My School Bag', img: svgs.bag_pencil_notebook, prompt: 'Look at the bag.', instruction: 'Answer: Do you have a notebook?', audioQ: 'Do you have a notebook?', expected: 'speaking' },
+        { type: 'situation', title: 'Situation 3: At My Desk', prompt: 'You want to borrow things.', instruction: 'Ask: Do you have a pencil case?', audioQ: null, expected: 'speaking' },
+        { type: 'situation_open', title: 'Situation 4: Talking to My Friend', prompt: 'Let\'s talk about your real things.', instruction: 'Answer: Do you have a pencil?', audioQ: 'Do you have a pencil?', expected: 'speaking' },
+        { type: 'situation', title: 'Situation 5: Ready for School', prompt: 'Getting ready!', instruction: 'Answer: Do you have an eraser?', audioQ: 'Do you have an eraser?', expected: 'speaking' },
+        { type: 'conversation', title: 'Situation 6: Conversation', instruction: 'Talk to the teacher.', lines: [{s:'Hello!', r:'Hi!'}, {s:'Do you have a pencil?', r: 'Yes, I do.'}, {s:'Do you have a pencil case?', r: 'No, I don\'t.'}] }
+    ];
+
+
+    let state = {
+        screen: 'home',
+        sound: true,
+        score: 0,
+        levelScores: { 1: 0, 2: 0, 3: 0 },
+        currentCard: 0,
+        currentLevel: null,
+        currentTask: 0,
+        tasks: [],
+        taskAttempts: 0
+    };
+
+    // Load from local storage
+    try {
+        const saved = localStorage.getItem('mySchoolThingsState');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            state.score = parsed.score || 0;
+            state.levelScores = parsed.levelScores || { 1: 0, 2: 0, 3: 0 };
+        }
+    } catch(e) {}
+
+    function saveProgress() {
+        try {
+            localStorage.setItem('mySchoolThingsState', JSON.stringify({
+                score: state.score,
+                levelScores: state.levelScores
+            }));
+        } catch(e) {}
+    }
+
+    const appContainer = document.getElementById('app-container');
+    const totalStarsEl = document.getElementById('total-stars');
+
+    /* ==========================================
+       AUDIO & RECORDING UTILS
+       ========================================== */
+    const synth = window.speechSynthesis;
+    let preferredVoice = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordedAudioUrl = null;
+    let recordedAudioObj = null;
+
+    // Try to get British voice
+    function initVoices() {
+        const voices = synth.getVoices();
+        preferredVoice = voices.find(v => v.lang === 'en-GB' || v.lang === 'en_GB') 
+                         || voices.find(v => v.lang.includes('en')) || null;
+    }
+    initVoices();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = initVoices;
+    }
+
+    function speak(text, rate = 0.85) {
+        if (!state.sound) return;
+        synth.cancel();
+        const utterThis = new SpeechSynthesisUtterance(text);
+        if (preferredVoice) utterThis.voice = preferredVoice;
+        utterThis.rate = rate;
+        utterThis.pitch = 1.1; // Make it sound a bit cuter
+        synth.speak(utterThis);
+    }
+
+    const sfx = {
+        correct: new Audio('data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/9k='), // Dummy base64 to avoid external requests, using beep below
+        wrong: null
+    };
+    
+    // Synthesize simple beeps using AudioContext to avoid external files
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration, vol=0.1) {
+        if (!state.sound || audioCtx.state === 'suspended') return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+    function playCorrect() { playTone(600, 'sine', 0.1); setTimeout(()=>playTone(800, 'sine', 0.2), 100); }
+    function playWrong() { playTone(300, 'sawtooth', 0.3); }
+
+    // Recording Setup
+    async function setupRecording(btnRecord, btnPlay) {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = e => { audioChunks.push(e.data); };
+                
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { 'type' : 'audio/webm; codecs=opus' });
+                    audioChunks = [];
+                    recordedAudioUrl = window.URL.createObjectURL(blob);
+                    recordedAudioObj = new Audio(recordedAudioUrl);
+                    btnPlay.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btnPlay.disabled = false;
+                };
+
+                btnRecord.onclick = () => {
+                    if (mediaRecorder.state === 'inactive') {
+                        mediaRecorder.start();
+                        btnRecord.innerHTML = '🛑 Stop';
+                        btnRecord.classList.replace('bg-red-500', 'bg-red-700');
+                        btnRecord.classList.add('animate-pulse');
+                        if(btnPlay) { btnPlay.disabled = true; btnPlay.classList.add('opacity-50'); }
+                    } else {
+                        mediaRecorder.stop();
+                        btnRecord.innerHTML = '🎤 Record';
+                        btnRecord.classList.replace('bg-red-700', 'bg-red-500');
+                        btnRecord.classList.remove('animate-pulse');
+                    }
+                };
+
+                btnPlay.onclick = () => {
+                    if (recordedAudioObj) recordedAudioObj.play();
+                };
+
+            } catch (err) {
+                console.error("Mic error:", err);
+                btnRecord.onclick = () => alert("Microphone access denied or not available. Please practice with a teacher/parent.");
+            }
+        } else {
+             btnRecord.onclick = () => alert("Recording not supported on this browser. Practice speaking aloud!");
+        }
+    }
+
+
+    /* ==========================================
+       NAVIGATION & RENDERING CORE
+       ========================================== */
+    function updateUI() {
+        totalStarsEl.innerText = state.score;
+        appContainer.innerHTML = '';
+        appContainer.className = 'w-full max-w-4xl flex-1 p-4 flex flex-col relative pb-20 animate-pop-in';
+
+        if (state.screen === 'home') renderHome();
+        else if (state.screen === 'flashcards') renderFlashcards();
+        else if (state.screen === 'practice_menu') renderPracticeMenu();
+        else if (state.screen.startsWith('level')) renderLevelTask();
+        else if (state.screen === 'summary') renderSummary();
+    }
+
+    document.getElementById('btn-home').onclick = () => { state.screen = 'home'; updateUI(); };
+    
+    const btnSound = document.getElementById('btn-sound');
+    btnSound.onclick = () => { 
+        state.sound = !state.sound; 
+        btnSound.innerHTML = state.sound ? '🔊' : '🔇';
+        btnSound.classList.toggle('bg-gray-200');
+        btnSound.classList.toggle('bg-red-200');
+        if(state.sound) audioCtx.resume();
+    };
+
+    /* ==========================================
+       SCREENS
+       ========================================== */
+
+    // --- HOME ---
+    function renderHome() {
+        appContainer.innerHTML = `
+            <div class="flex-1 flex flex-col items-center justify-center text-center gap-8 mt-10">
+                <div class="w-40 h-40 animate-bounce-slow">
+                    ${svgs.mascot}
+                </div>
+                <div>
+                    <h1 class="text-4xl md:text-5xl font-extrabold text-blue-600 drop-shadow-sm mb-2 uppercase tracking-wide">
+                        My School Things
+                    </h1>
+                    <p class="text-xl text-gray-600 font-bold bg-white px-6 py-2 rounded-full inline-block border-2 border-dashed border-pink-300 shadow-sm">
+                        Listen - Speak - Have Fun!
+                    </p>
+                </div>
+                
+                <div class="bg-white p-4 rounded-2xl shadow-lg border-2 border-yellow-300 inline-block mb-8">
+                    <p class="text-lg font-bold text-gray-700">🐻 Hello! Let's learn English!</p>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-6 w-full max-w-lg px-4">
+                    <button onclick="state.screen='flashcards'; state.currentCard=0; updateUI();" 
+                            class="flex-1 btn-cute bg-pink-400 hover:bg-pink-500 text-white text-2xl font-bold py-6 px-8 rounded-3xl border-pink-600 shadow-lg flex flex-col items-center gap-2">
+                        <span class="text-4xl">🎴</span>
+                        FLASHCARDS
+                        <span class="text-sm font-normal bg-white text-pink-600 px-3 py-1 rounded-full mt-1">Learn New Words</span>
+                    </button>
+                    <button onclick="state.screen='practice_menu'; updateUI();" 
+                            class="flex-1 btn-cute bg-green-400 hover:bg-green-500 text-white text-2xl font-bold py-6 px-8 rounded-3xl border-green-600 shadow-lg flex flex-col items-center gap-2">
+                        <span class="text-4xl">🎯</span>
+                        PRACTICE
+                        <span class="text-sm font-normal bg-white text-green-600 px-3 py-1 rounded-full mt-1">Listen & Speak</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- FLASHCARDS ---
+    function renderFlashcards() {
+        const card = FLASHCARDS_DATA[state.currentCard];
+        const isVocab = !card.type;
+
+        appContainer.innerHTML = `
+            <div class="w-full flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-blue-600 bg-white px-4 py-1 rounded-full border-2 border-blue-200">
+                    Card ${state.currentCard + 1} of ${FLASHCARDS_DATA.length}
+                </h2>
+                <div class="text-gray-500 font-semibold">Tap card to flip</div>
+            </div>
+            
+            <div class="flex-1 flex items-center justify-center w-full perspective-1000 mb-8 max-w-md mx-auto h-96">
+                <div id="fc-inner" class="card" onclick="this.classList.toggle('is-flipped')">
+                    <!-- FRONT -->
+                    <div class="card-face flex flex-col justify-center items-center gap-6">
+                        ${isVocab ? 
+                            `<div class="w-48 h-48">${card.svg}</div>
+                             <button onclick="event.stopPropagation(); speak('${card.word}')" class="btn-cute bg-blue-100 p-4 rounded-full border-blue-300 shadow-md">
+                                🔊 Listen
+                             </button>` 
+                            : 
+                            `<div class="text-center">
+                                <div class="text-5xl mb-4">💬</div>
+                                <h3 class="text-3xl font-bold text-gray-800">${card.title}</h3>
+                             </div>`
+                        }
+                    </div>
+                    <!-- BACK -->
+                    <div class="card-face card-face-back flex flex-col justify-center items-center text-center p-6 gap-4">
+                        <h3 class="text-3xl font-extrabold text-blue-600">${isVocab ? card.word : card.main}</h3>
+                        ${isVocab ? `<p class="text-xl text-gray-500 font-mono">${card.ipa}</p>` : ''}
+                        <p class="text-lg text-pink-500 font-bold bg-pink-50 px-4 py-1 rounded-lg w-full">${card.vi}</p>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg w-full text-sm font-semibold text-gray-600 border border-gray-200 mt-2">
+                            ${isVocab ? `Ex: ${card.ex}` : `Structure: ${card.struct}`}
+                        </div>
+
+                        <div class="flex flex-wrap justify-center gap-3 mt-4" onclick="event.stopPropagation();">
+                            <button onclick="speak('${isVocab ? card.word : card.main}')" class="btn-cute bg-blue-400 text-white px-4 py-2 rounded-full border-blue-600 font-bold text-sm flex items-center gap-1">
+                                🔊 Listen
+                            </button>
+                            <button id="fc-record" class="btn-cute bg-red-500 text-white px-4 py-2 rounded-full border-red-700 font-bold text-sm flex items-center gap-1">
+                                🎤 Record
+                            </button>
+                            <button id="fc-play" disabled class="btn-cute bg-green-500 text-white px-4 py-2 rounded-full border-green-700 font-bold text-sm opacity-50 cursor-not-allowed flex items-center gap-1">
+                                ▶ Play
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full flex justify-between mt-auto">
+                <button onclick="prevCard()" class="btn-cute bg-gray-300 text-gray-700 font-bold py-3 px-8 rounded-full border-gray-400 ${state.currentCard === 0 ? 'invisible' : ''}">
+                    ⬅ Back
+                </button>
+                <button onclick="nextCard()" class="btn-cute bg-blue-500 text-white font-bold py-3 px-8 rounded-full border-blue-700 text-lg">
+                    ${state.currentCard === FLASHCARDS_DATA.length - 1 ? 'Finish 🏁' : 'Next ➡'}
+                </button>
+            </div>
+        `;
+
+        setupRecording(document.getElementById('fc-record'), document.getElementById('fc-play'));
+    }
+
+    function nextCard() {
+        if (state.currentCard < FLASHCARDS_DATA.length - 1) {
+            state.currentCard++;
+            updateUI();
+        } else {
+            showModal('Excellent! 🌟', 'You have learned all words and sentences. You are ready to practise!', () => {
+                state.screen = 'practice_menu';
+                updateUI();
+            });
+        }
+    }
+    function prevCard() {
+        if (state.currentCard > 0) { state.currentCard--; updateUI(); }
+    }
+
+    // --- PRACTICE MENU ---
+    function renderPracticeMenu() {
+        const levels = [
+            { id: 1, name: 'BASIC', desc: 'Listen & Identify', stars: '⭐', color: 'blue' },
+            { id: 2, name: 'INTERMEDIATE', desc: 'Complete & Ask', stars: '⭐⭐', color: 'yellow' },
+            { id: 3, name: 'ADVANCED', desc: 'Real Conversations', stars: '⭐⭐⭐', color: 'pink' }
+        ];
+
+        let html = `<h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Choose Your Level</h2><div class="flex flex-col gap-6 w-full max-w-lg mx-auto">`;
+
+        levels.forEach(l => {
+            const maxScore = l.id === 3 ? 60 : 100;
+            const currentScore = state.levelScores[l.id];
+            const pct = Math.round((currentScore / maxScore) * 100) || 0;
+            const colorClass = `bg-${l.color}-400`;
+            const borderClass = `border-${l.color}-600`;
+
+            html += `
+                <button onclick="startLevel(${l.id})" class="btn-cute bg-white p-4 rounded-3xl border-4 ${borderClass} shadow-lg flex flex-col text-left transition-transform hover:scale-105">
+                    <div class="flex justify-between items-center w-full mb-2">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">LEVEL ${l.id} - ${l.name}</h3>
+                            <p class="text-gray-500 font-semibold">${l.desc}</p>
+                        </div>
+                        <div class="text-2xl">${l.stars}</div>
+                    </div>
+                    <div class="w-full flex items-center gap-3">
+                        <div class="progress-container flex-1">
+                            <div class="progress-bar ${colorClass}" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="font-bold text-gray-700 min-w-[40px] text-right">${pct}%</span>
+                    </div>
+                </button>
+            `;
+        });
+
+        html += `</div>`;
+        appContainer.innerHTML = html;
+    }
+
+    function startLevel(lvl) {
+        state.currentLevel = lvl;
+        state.currentTask = 0;
+        state.taskAttempts = 0;
+        state.screen = `level${lvl}`;
+        if(lvl === 1) state.tasks = generateLevel1Tasks();
+        if(lvl === 2) state.tasks = generateLevel2Tasks();
+        if(lvl === 3) state.tasks = generateLevel3Tasks();
+        // Reset score for this session
+        state.sessionScore = 0; 
+        updateUI();
+    }
+
+    // --- LEVEL TASK RENDERER ---
+    function renderLevelTask() {
+        const task = state.tasks[state.currentTask];
+        const total = state.tasks.length;
+        
+        let html = `
+            <div class="w-full flex flex-col mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-bold text-gray-700">Level ${state.currentLevel} <span class="text-gray-400 ml-2">Task ${state.currentTask + 1}/${total}</span></h2>
+                    <div class="font-bold text-yellow-600 bg-yellow-100 px-3 py-1 rounded-full">Score: ${state.sessionScore}</div>
+                </div>
+                <div class="progress-container h-2">
+                    <div class="progress-bar bg-blue-500" style="width: ${(state.currentTask / total) * 100}%"></div>
+                </div>
+            </div>
+            
+            <div class="flex-1 bg-white rounded-3xl shadow-md border border-gray-200 p-6 flex flex-col items-center justify-center w-full max-w-2xl mx-auto relative overflow-hidden" id="task-area">
+        `;
+
+        // Generate specific task content
+        switch (task.type) {
+            // LEVEL 1
+            case 'listen_choose': html += renderListenChoose(task); break;
+            case 'look_listen_repeat': html += renderLookListenRepeat(task); break;
+            case 'yes_no_pic': html += renderYesNoPic(task); break;
+            // LEVEL 2
+            case 'listen_complete': html += renderListenComplete(task); break;
+            case 'bag_answer': html += renderBagAnswer(task); break;
+            case 'ask_answer_roleplay': html += renderAskAnswer(task); break;
+            // LEVEL 3
+            case 'situation': html += renderSituation(task); break;
+            case 'situation_pic': html += renderSituationPic(task); break;
+            case 'situation_open': html += renderSituationOpen(task); break;
+            case 'conversation': html += renderConversation(task); break;
+        }
+
+        html += `</div>`;
+        appContainer.innerHTML = html;
+
+        // Auto-play audio for tasks that need it
+        if (task.audio) setTimeout(() => speak(task.audio), 300);
+        if (task.audioQ) setTimeout(() => speak(task.audioQ), 300);
+
+        // Bind logic after rendering
+        bindTaskLogic(task);
+    }
+
+    // --- Task Rendering Fragments ---
+    function renderListenChoose(task) {
+        let opts = [...VOCAB].sort(() => 0.5 - Math.random());
+        return `
+            <button onclick="speak('${task.audio}')" class="btn-cute bg-blue-100 text-blue-700 p-4 rounded-full mb-6 border-blue-300">🔊 Listen to the word</button>
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md">
+                ${opts.map(o => `
+                    <button class="choice-btn btn-cute bg-gray-50 border-2 border-gray-200 rounded-xl p-4 h-32 flex justify-center items-center transition-all hover:bg-blue-50" data-id="${o.id}">
+                        <div class="w-full h-full pointer-events-none">${o.svg}</div>
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderLookListenRepeat(task) {
+        return `
+            <div class="w-40 h-40 mb-4">${task.svg}</div>
+            <h3 class="text-3xl font-bold text-gray-800 mb-2">${task.word}</h3>
+            <button onclick="speak('${task.word}')" class="btn-cute bg-blue-100 text-blue-700 px-4 py-2 rounded-full mb-8 font-bold text-sm">🔊 Listen Model</button>
+            
+            <div class="flex gap-4 mb-8">
+                <button id="task-record" class="btn-cute bg-red-500 text-white px-6 py-3 rounded-full border-red-700 font-bold text-lg">🎤 Record</button>
+                <button id="task-play" disabled class="btn-cute bg-green-500 text-white px-6 py-3 rounded-full border-green-700 font-bold text-lg opacity-50 cursor-not-allowed">▶ Play</button>
+            </div>
+            
+            <div class="w-full bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-center">
+                <p class="text-sm text-gray-600 mb-2">Parent/Teacher: Is it correct?</p>
+                <div class="flex justify-center gap-3">
+                    <button class="btn-cute bg-green-400 text-white px-4 py-2 rounded-full font-bold w-32" onclick="handleSpeakingResult(true)">✅ Yes</button>
+                    <button class="btn-cute bg-gray-300 text-gray-700 px-4 py-2 rounded-full font-bold w-32" onclick="handleSpeakingResult(false)">🔁 Try Again</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderYesNoPic(task) {
+        return `
+            <div class="w-48 h-48 mb-6 bg-white rounded-xl shadow-inner p-4 border border-gray-100">${task.img}</div>
+            <div class="flex items-center gap-2 mb-8">
+                <button onclick="speak('${task.q}')" class="btn-cute bg-blue-100 p-2 rounded-full"><span class="text-xl">🔊</span></button>
+                <h3 class="text-2xl font-bold text-gray-800">"${task.q}"</h3>
+            </div>
+            <div class="flex gap-4 w-full max-w-sm">
+                <button class="choice-btn flex-1 btn-cute bg-green-400 text-white font-bold text-xl py-4 rounded-2xl border-green-600" data-id="yes">Yes, I do.</button>
+                <button class="choice-btn flex-1 btn-cute bg-red-400 text-white font-bold text-xl py-4 rounded-2xl border-red-600" data-id="no">No, I don't.</button>
+            </div>
+        `;
+    }
+
+    function renderListenComplete(task) {
+        let opts = [...task.options].sort(() => 0.5 - Math.random());
+        return `
+            <button onclick="speak('${task.audio}')" class="btn-cute bg-blue-100 p-4 rounded-full mb-6">🔊 Listen</button>
+            <h3 class="text-3xl font-bold text-gray-800 mb-8 border-b-4 border-dashed border-gray-300 pb-2">${task.text}</h3>
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md">
+                ${opts.map(o => `
+                    <button class="choice-btn btn-cute bg-white border-2 border-gray-300 text-lg font-bold text-gray-700 rounded-xl py-4 hover:bg-blue-50" data-id="${o}">${o}</button>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderBagAnswer(task) {
+        return `
+            <div class="text-center mb-4"><span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold text-sm">Look at the bag</span></div>
+            <div class="w-48 h-48 mb-6">${svgs.bag_pencil_notebook}</div>
+             <div class="flex items-center gap-2 mb-8">
+                <button onclick="speak('${task.q}')" class="btn-cute bg-blue-100 p-2 rounded-full"><span class="text-xl">🔊</span></button>
+                <h3 class="text-2xl font-bold text-gray-800">"${task.q}"</h3>
+            </div>
+            <div class="flex gap-4 w-full max-w-sm">
+                <button class="choice-btn flex-1 btn-cute bg-green-400 text-white font-bold text-xl py-4 rounded-2xl border-green-600" data-id="yes">Yes, I do.</button>
+                <button class="choice-btn flex-1 btn-cute bg-red-400 text-white font-bold text-xl py-4 rounded-2xl border-red-600" data-id="no">No, I don't.</button>
+            </div>
+        `;
+    }
+
+    function renderAskAnswer(task) {
+        return `
+            <div class="flex justify-around w-full mb-6 relative">
+                <div class="w-24 h-24">${svgs.boy}</div>
+                <div class="w-24 h-24">${svgs.girl}</div>
+                <!-- Speech bubble hint -->
+                 <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -mt-4 bg-white border-2 border-gray-300 px-4 py-2 rounded-2xl shadow-sm text-sm font-bold text-gray-500 opacity-50">
+                    Hint: ${task.q}
+                 </div>
+            </div>
+            <div class="text-center mb-6">
+                <h3 class="text-xl font-bold text-blue-600 mb-1">Your turn to ASK!</h3>
+                <p class="text-gray-600 font-semibold">Say: "${task.q}"</p>
+                <button onclick="speak('${task.q}')" class="btn-cute bg-gray-100 text-gray-600 px-3 py-1 rounded-full mt-2 text-xs">🔊 Listen model</button>
+            </div>
+            ${getRecordingUI()}
+        `;
+    }
+
+    // LEVEL 3
+    function renderSituation(task) {
+        return `
+            <div class="bg-blue-50 text-blue-800 font-bold px-4 py-1 rounded-full mb-4">${task.title}</div>
+            <div class="bg-white border-2 border-gray-200 p-4 rounded-xl w-full text-left mb-6 shadow-sm">
+                <pre class="font-sans text-lg font-semibold text-gray-700 whitespace-pre-wrap">${task.prompt}</pre>
+            </div>
+            <h3 class="text-xl font-bold text-pink-600 mb-6 flex items-center justify-center gap-2">
+                <button onclick="speak('${task.audioQ}')" class="btn-cute bg-pink-100 p-2 rounded-full"><span class="text-sm">🔊</span></button>
+                ${task.instruction}
+            </h3>
+            ${getRecordingUI()}
+        `;
+    }
+
+    function renderSituationPic(task) {
+        return `
+            <div class="bg-blue-50 text-blue-800 font-bold px-4 py-1 rounded-full mb-4">${task.title}</div>
+            <p class="font-bold text-gray-600 mb-2">${task.prompt}</p>
+            <div class="w-40 h-40 mb-6">${task.img}</div>
+            <h3 class="text-xl font-bold text-pink-600 mb-6 flex items-center justify-center gap-2">
+                <button onclick="speak('${task.audioQ}')" class="btn-cute bg-pink-100 p-2 rounded-full"><span class="text-sm">🔊</span></button>
+                ${task.instruction}
+            </h3>
+            ${getRecordingUI()}
+        `;
+    }
+
+    function renderSituationOpen(task) {
+        return `
+            <div class="bg-green-50 text-green-800 font-bold px-4 py-1 rounded-full mb-4">${task.title}</div>
+            <div class="w-24 h-24 mb-4">${svgs.mascot}</div>
+            <p class="font-bold text-gray-600 mb-4 text-center">${task.prompt}</p>
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-center gap-2">
+                <button onclick="speak('${task.audioQ}')" class="btn-cute bg-gray-200 p-2 rounded-full"><span class="text-sm">🔊</span></button>
+                "${task.audioQ}"
+            </h3>
+            <p class="text-sm text-pink-500 font-bold mb-4">(Look in your real bag and answer!)</p>
+            ${getRecordingUI()}
+        `;
+    }
+
+    function renderConversation(task) {
+        const linesHtml = task.lines.map((l, i) => `
+            <div class="flex flex-col gap-2 mb-4 w-full">
+                <div class="flex items-start gap-2">
+                    <div class="w-8 h-8 flex-shrink-0">${svgs.mascot}</div>
+                    <div class="bg-gray-100 rounded-2xl rounded-tl-none p-3 relative group w-full">
+                        <p class="font-bold text-gray-800">${l.s}</p>
+                        <button onclick="speak('${l.s}')" class="absolute -right-2 top-2 bg-white rounded-full p-1 shadow-sm text-xs opacity-0 group-hover:opacity-100 transition-opacity">🔊</button>
+                    </div>
+                </div>
+                <div class="flex items-start gap-2 flex-row-reverse">
+                     <div class="w-8 h-8 flex-shrink-0 bg-blue-200 rounded-full flex items-center justify-center text-sm">You</div>
+                     <div class="bg-blue-100 rounded-2xl rounded-tr-none p-3 text-right w-full">
+                        <p class="font-bold text-blue-800">${l.r}</p>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        return `
+            <div class="bg-purple-50 text-purple-800 font-bold px-4 py-1 rounded-full mb-4">${task.title}</div>
+            <p class="font-bold text-gray-600 mb-4">${task.instruction}</p>
+            <div class="w-full max-h-48 overflow-y-auto pr-2 mb-6 border-2 border-gray-100 rounded-xl p-2 bg-gray-50">
+                ${linesHtml}
+            </div>
+             <p class="text-sm text-gray-500 font-bold mb-2 text-center">Read your blue lines!</p>
+            ${getRecordingUI()}
+        `;
+    }
+
+    function getRecordingUI() {
+        return `
+            <div class="flex gap-4 mb-6">
+                <button id="task-record" class="btn-cute bg-red-500 text-white px-6 py-3 rounded-full border-red-700 font-bold text-lg">🎤 Record</button>
+                <button id="task-play" disabled class="btn-cute bg-green-500 text-white px-6 py-3 rounded-full border-green-700 font-bold text-lg opacity-50 cursor-not-allowed">▶ Play</button>
+            </div>
+            
+            <div class="w-full bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-center">
+                <p class="text-sm text-gray-600 mb-2">Parent/Teacher Confirmation</p>
+                <div class="flex justify-center gap-3">
+                    <button class="btn-cute bg-green-400 text-white px-4 py-2 rounded-full font-bold w-32" onclick="handleSpeakingResult(true)">✅ Good!</button>
+                    <button class="btn-cute bg-gray-300 text-gray-700 px-4 py-2 rounded-full font-bold w-32" onclick="handleSpeakingResult(false)">🔁 Retry</button>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- Task Interaction Logic ---
+    function bindTaskLogic(task) {
+        // Choice buttons
+        const btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(btn => {
+            btn.onclick = (e) => {
+                const selected = e.currentTarget.dataset.id;
+                const isCorrect = selected === task.correct;
+                
+                if (isCorrect) {
+                    playCorrect();
+                    e.currentTarget.classList.add('correct-glow', 'bg-green-100');
+                    createParticles(e.currentTarget);
+                    setTimeout(() => processCorrectAnswer(), 1000);
+                } else {
+                    playWrong();
+                    e.currentTarget.classList.add('wrong-glow', 'animate-bounce-slow');
+                    speak("Try again", 1.0);
+                    setTimeout(() => {
+                        e.currentTarget.classList.remove('wrong-glow', 'animate-bounce-slow');
+                    }, 800);
+                }
+            };
+        });
+
+        // Recording
+        const recBtn = document.getElementById('task-record');
+        const playBtn = document.getElementById('task-play');
+        if (recBtn && playBtn) {
+            setupRecording(recBtn, playBtn);
+        }
+    }
+
+    window.handleSpeakingResult = function(isCorrect) {
+        if(isCorrect) {
+            playCorrect();
+            processCorrectAnswer();
+        } else {
+            playWrong();
+            // Just let them try recording again
+        }
+    }
+
+    function processCorrectAnswer() {
+        // Only award points on first correct attempt? Request says: "Không cộng điểm lặp lại cho cùng một nhiệm vụ trong một lượt chơi."
+        // We handle this by adding 10 points per unique task completed in the current session.
+        state.sessionScore += 10;
+        
+        if (state.currentTask < state.tasks.length - 1) {
+            state.currentTask++;
+            updateUI();
+        } else {
+            finishLevel();
+        }
+    }
+
+    function finishLevel() {
+        // Update global score
+        const maxScore = state.tasks.length * 10;
+        if (state.sessionScore > state.levelScores[state.currentLevel]) {
+            // Only update total score with the difference if they beat their high score
+            const diff = state.sessionScore - state.levelScores[state.currentLevel];
+            state.score += diff;
+            state.levelScores[state.currentLevel] = state.sessionScore;
+            saveProgress();
+        }
+
+        const pct = Math.round((state.sessionScore / maxScore) * 100);
+        let msg = "Keep practising!";
+        if (pct >= 90) msg = "Excellent! 🌟🌟🌟";
+        else if (pct >= 70) msg = "Very good! 🌟🌟";
+
+        showModal('Level Complete!', `You scored ${state.sessionScore}/${maxScore}.<br/>${msg}`, () => {
+            state.screen = 'practice_menu';
+            updateUI();
+        });
+    }
+
+    // --- Particle Effects ---
+    function createParticles(element) {
+        const rect = element.getBoundingClientRect();
+        for (let i = 0; i < 10; i++) {
+            const particle = document.createElement('div');
+            particle.innerHTML = '⭐';
+            particle.style.position = 'fixed';
+            particle.style.left = rect.left + rect.width / 2 + 'px';
+            particle.style.top = rect.top + rect.height / 2 + 'px';
+            particle.style.fontSize = Math.random() * 20 + 10 + 'px';
+            particle.style.pointerEvents = 'none';
+            particle.style.transition = 'all 1s cubic-bezier(0.1, 0.8, 0.3, 1)';
+            particle.style.zIndex = 100;
+            document.body.appendChild(particle);
+
+            // Animate
+            setTimeout(() => {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 100 + 50;
+                particle.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) rotate(${Math.random() * 360}deg)`;
+                particle.style.opacity = '0';
+            }, 50);
+
+            setTimeout(() => particle.remove(), 1050);
+        }
+    }
+
+    // --- Modal ---
+    function showModal(title, desc, onContinue) {
+        document.getElementById('modal-title').innerHTML = title;
+        document.getElementById('modal-desc').innerHTML = desc;
+        const modal = document.getElementById('modal-overlay');
+        const content = document.getElementById('modal-content');
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => content.classList.remove('scale-90'), 10); // trigger animation
+
+        document.getElementById('modal-btn').onclick = () => {
+            content.classList.add('scale-90');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                if(onContinue) onContinue();
+            }, 200);
+        };
+    }
+
+    // Init
+    updateUI();
+
+</script>
+</body>
+</html>
